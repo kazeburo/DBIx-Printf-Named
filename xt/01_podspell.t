@@ -8,3 +8,8 @@ __DATA__
 Masahiro Nagano
 kazeburo {at} gmail.com
 DBIx::Printf::Named
+SQL
+kazuho
+oku
+placeholders
+
