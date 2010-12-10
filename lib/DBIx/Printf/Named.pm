@@ -102,7 +102,7 @@ DBIx::Printf::Named - A named-printf-style prepared statement
   use DBIx::Printf;
 
   my $sql = $dbh->nprintf(
-      'select * from t where str=%{str}s or int=%{int}d or float=%{float}f',
+      'select * from t where str=%(str)s or int=%(int)d or float=%(float)f',
       {
           str => 'string',
           int => 1,
