@@ -11,15 +11,17 @@ use Regexp::Common qw /balanced/;
 our $VERSION = '0.01';
 
 sub _printf {
-    my ($dbh, $fmt, $params, $in_like) = @_;
+    my ($dbh, $fmt, $params, $in_like, $like_escape) = @_;
     my $re = $RE{balanced}{-parens=>'()'}{-keep};
-    $fmt =~ s/\%(?:\((.+?)\)([dfst])|like$re|(\%))/
+    $fmt =~ s/\%(?:\((.+?)\)([dfst])|like$re((?i)\s+ESCAPE\s+(['"])(.*?)\5(?:\s+|$))?|(\%))/
         _printf_quote({
             dbh      => $dbh,
             params   => $params,
             key      => $1,
-            type     => $2 || ( $4 || 'like'),
+            type     => $2 || ( $7 || 'like'),
             like_fmt => $3,
+            like_escape => $4,
+            like_escape_char => defined $like_escape ? $like_escape : $6,
             in_like  => $in_like,
         })
             /eg;
@@ -34,34 +36,30 @@ sub _printf_quote {
     } elsif ($in->{type} eq 'like') {
         $in->{like_fmt} =~ s/(:?^\(|\)$)//g if $in->{like_fmt};
         return "'"
-            . _printf($in->{dbh}, $in->{like_fmt}, $in->{params}, 1)
-                . "'";
+            . _printf($in->{dbh}, $in->{like_fmt}, $in->{params}, 1, $in->{like_escape_char})
+                . "'" . ($in->{like_escape} || '');
     }
     $in->{params} ||= {};
     Carp::Clan::croak "$in->{key} is not exists in parameters" 
             if ! exists $in->{params}->{$in->{key}};
 
     return _printf_quote_simple(
-        $in->{dbh}, $in->{type}, $in->{params}->{$in->{key}}, $in->{in_like}
+        $in->{dbh}, $in->{type}, $in->{params}->{$in->{key}}, $in->{in_like}, $in->{like_escape_char}
     );
 }
 
 sub _printf_quote_simple {
     no warnings;
-    my ($dbh, $type, $param, $in_like) = @_;
+    my ($dbh, $type, $param, $in_like, $like_escape_char) = @_;
         
     if ($type eq 'd') {
         $param = int($param);
     } elsif ($type eq 'f') {
         $param = $param + 0;
-    } elsif ($type eq 'l') {
-        $param = s/[\%_]/\\$1/g;
-        $param = $dbh->quote($param); # be paranoiac, use DBI::db::quote
-        $param =~ s/^'(.*)'$/$1/s
-            or Carp::Clan::croak "unexpected quote char used: $param\n";
     } elsif ($type eq 's') {
         if ($in_like) {
-            $param =~ s/[%_]/\\$&/g;
+            my $escape_char = defined $like_escape_char ? $like_escape_char : '\\';
+            $param =~ s/[${escape_char}%_]/$escape_char$&/g;
         }
         $param = $dbh->quote($param);
         if ($in_like) {

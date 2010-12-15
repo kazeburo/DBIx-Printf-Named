@@ -29,6 +29,14 @@ is($dbh->nprintf('select 1 like %like()'), "select 1 like ''", 'empty %like');
 is($dbh->nprintf('select 1 like %like(%(key)s%%)', {key=>'a'}), "select 1 like 'a%'", '%like');
 is($dbh->nprintf('select 1 like %like(%(key)s%%)', {key=>"%a_b'"}), "select 1 like '\\%a\\_b''%'", '%like escape check');
 
+is($dbh->nprintf(q!select 1 like %like(%(key)s%%) escape '\'!, {key=>"%a_b'"}), qq!select 1 like '\\%a\\_b''%' escape '\\'!, '%like escape check backslash');
+is($dbh->nprintf(q!select 1 like %like(%(key)s%%) ESCAPE '$'!, {key=>"%a_b'"}), qq!select 1 like '\$%a\$_b''%' ESCAPE '\$'!, '%like escape check doller');
+is($dbh->nprintf(q!select 1 like %like(%(key)s%%) Escape ''!, {key=>"%a_b'"}), qq!select 1 like '%a_b''%' Escape ''!, '%like escape check backslash');
+is($dbh->nprintf(<<'EOF',{key=>"%a_b'"}), qq!select 1 like '\*%a\*_b''%'\nESCAPE '\*'\n!, '%like escape check *');
+select 1 like %like(%(key)s%%)
+ESCAPE '*'
+EOF
+
 eval {
     $dbh->nprintf('select %(key)d',{key2=>'a'});
 };
